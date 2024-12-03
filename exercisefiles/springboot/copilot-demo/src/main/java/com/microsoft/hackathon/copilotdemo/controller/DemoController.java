@@ -2,7 +2,11 @@ package com.microsoft.hackathon.copilotdemo.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -12,12 +16,18 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -25,6 +35,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @RestController
 public class DemoController {
@@ -185,5 +197,115 @@ public class DemoController {
         response.put("folders", folders);
         return response;
     }
+
+    /**
+     * Given the path of a file and count the number of occurrence of a provided word. The path and the word should be query parameters. The response should be in Json format.
+     */
+    @GetMapping("/count-word")
+    public Map<String, Object> countWordOccurrences(@RequestParam("path") String path,
+                                                    @RequestParam("word") String word) {
+        if (word.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Word cannot be empty");
+        }
+
+        File file = new File(path);
+
+        if (!file.exists()) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "File does not exist: " + path);
+        }
+
+        if (!file.isFile()) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "The provided path is not a file: " + path);
+        }
+
+        int wordCount = 0;
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                wordCount += countOccurrences(line, word);
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error reading the file: " + path, e);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("path", path);
+        response.put("word", word);
+        response.put("occurrences", wordCount);
+
+        return response;
+    }
+
+    private int countOccurrences(String line, String word) {
+        int count = 0;
+        int index = 0;
+
+        while ((index = line.indexOf(word, index)) != -1) {
+            count++;
+            index += word.length();
+        }
+
+        return count;
+    }
+
+    @GetMapping("/zip-folder")
+    public ResponseEntity<InputStreamResource> zipFolder(@RequestParam("path") String path) {
+        File folder = new File(path);
+
+        if (!folder.exists()) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Folder does not exist: " + path);
+        }
+
+        if (!folder.isDirectory()) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "The provided path is not a folder: " + path);
+        }
+
+        String zipFilePath = folder.getAbsolutePath() + ".zip";
+        try (FileOutputStream fos = new FileOutputStream(zipFilePath);
+             ZipOutputStream zipOut = new ZipOutputStream(fos)) {
+
+            zipFolderContents(folder, folder.getName(), zipOut);
+
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error creating ZIP file", e);
+        }
+
+        try {
+            InputStreamResource resource = new InputStreamResource(Files.newInputStream(Paths.get(zipFilePath)));
+
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + folder.getName() + ".zip")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
+
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error reading ZIP file", e);
+        }
+    }
+
+    private void zipFolderContents(File folder, String parentFolder, ZipOutputStream zipOut) throws IOException {
+        File[] files = folder.listFiles();
+        if (files == null) {
+            return;
+        }
+
+        for (File file : files) {
+            String zipEntryName = parentFolder + "/" + file.getName();
+            if (file.isDirectory()) {
+                zipFolderContents(file, zipEntryName, zipOut);
+            } else {
+                try (FileInputStream fis = new FileInputStream(file)) {
+                    zipOut.putNextEntry(new ZipEntry(zipEntryName));
+                    byte[] buffer = new byte[1024];
+                    int length;
+                    while ((length = fis.read(buffer)) >= 0) {
+                        zipOut.write(buffer, 0, length); // Pass offset (0) and length
+                    }
+                    zipOut.closeEntry();
+                }
+            }
+        }
+    }
+
 
 }

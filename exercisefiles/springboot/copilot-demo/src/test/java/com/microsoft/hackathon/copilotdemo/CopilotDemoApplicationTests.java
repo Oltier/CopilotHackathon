@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.ExpectedCount;
@@ -304,6 +305,62 @@ class CopilotDemoApplicationTests {
     @Test
     void listFilesAndFolders_withEmptyPath_returnsError() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.get("/list-files?path="))
+            .andExpect(MockMvcResultMatchers.status().isInternalServerError());
+    }
+
+    @Test
+    void countWordOccurrences_withValidFileAndWord_returnsCorrectCount() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/count-word?path=src/main/resources/colors.json&word=hue"))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.jsonPath("$.path").value("src/main/resources/colors.json"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.word").value("hue"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.occurrences").value(5));
+    }
+
+    @Test
+    void countWordOccurrences_withNonExistentFile_returnsError() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/count-word?path=/non/existent/file.txt&word=test"))
+            .andExpect(MockMvcResultMatchers.status().isInternalServerError());
+    }
+
+    @Test
+    void countWordOccurrences_withDirectoryPath_returnsError() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/count-word?path=src/main/resources&word=test"))
+            .andExpect(MockMvcResultMatchers.status().isInternalServerError());
+    }
+
+    @Test
+    void countWordOccurrences_withEmptyWord_returnsZeroOccurrences() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/count-word?path=src/test/resources/testfile.txt&word="))
+            .andExpect(MockMvcResultMatchers.status().isBadRequest());
+    }
+
+    @Test
+    void countWordOccurrences_withSpecialCharactersInWord_returnsCorrectCount() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/count-word?path=src/main/resources/colors.json&word=hue\""))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.jsonPath("$.path").value("src/main/resources/colors.json"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.word").value("hue\""))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.occurrences").value(5));
+    }
+
+    @Test
+    void zipFolder_withValidFolder_returnsZippedFile() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/zip-folder?path=src/main/resources"))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resources.zip"))
+            .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_OCTET_STREAM));
+    }
+
+    @Test
+    void zipFolder_withNonExistentFolder_returnsError() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/zip-folder?path=/non/existent/folder"))
+            .andExpect(MockMvcResultMatchers.status().isInternalServerError());
+    }
+
+    @Test
+    void zipFolder_withFilePath_returnsError() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/zip-folder?path=src/test/resources/testfile.txt"))
             .andExpect(MockMvcResultMatchers.status().isInternalServerError());
     }
 

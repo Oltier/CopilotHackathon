@@ -12,12 +12,19 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 public class DemoController {
@@ -115,5 +122,68 @@ public class DemoController {
         }
     }
 
+    /**
+     * 7. URL parsing
+     * Given a url as query parameter, parse it and return the protocol, host, port, path and query parameters.
+     * The response should be in Json format.
+     */
+    @GetMapping("/parse-url")
+    public Map<String, Object> parseUrl(@RequestParam(value = "url") String url) {
+        try {
+            URL parsedUrl = new URL(URLDecoder.decode(url, StandardCharsets.UTF_8));
+            Map<String, Object> result = new HashMap<>();
+            result.put("protocol", parsedUrl.getProtocol());
+            result.put("host", parsedUrl.getHost());
+            result.put("port", parsedUrl.getPort());
+            result.put("path", parsedUrl.getPath());
+            result.put("query", parsedUrl.getQuery());
+            return result;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid URL");
+        }
+    }
+
+    /**
+     * 8. List files and folders
+     * List files and folders under a given path. The path should be a query parameter. The response should be in Json format.
+     */
+
+    @GetMapping("/list-files")
+    public Map<String, Object> listFilesAndFolders(@RequestParam("path") String path) {
+        File directory = new File(path);
+
+        if (!directory.exists()) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Path does not exist: " + path);
+        }
+
+        if (!directory.isDirectory()) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "The provided path is not a directory: " + path);
+        }
+
+        File[] filesAndFolders = directory.listFiles();
+
+        return getFilesAndFoldersOnPath(path, filesAndFolders);
+    }
+
+    private static Map<String, Object> getFilesAndFoldersOnPath(final String path, final File[] filesAndFolders) {
+        Map<String, Object> response = new HashMap<>();
+        List<String> files = new ArrayList<>();
+        List<String> folders = new ArrayList<>();
+
+        if (filesAndFolders != null) {
+            for (File file : filesAndFolders) {
+                if (file.isFile()) {
+                    files.add(file.getName());
+                } else if (file.isDirectory()) {
+                    folders.add(file.getName());
+                }
+            }
+        }
+
+        response.put("path", path);
+        response.put("files", files);
+        response.put("folders", folders);
+        return response;
+    }
 
 }

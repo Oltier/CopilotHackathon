@@ -224,4 +224,87 @@ class CopilotDemoApplicationTests {
             .andExpect(MockMvcResultMatchers.status().isInternalServerError());
     }
 
+    @Test
+    void parseUrl_withValidUrl_returnsParsedComponents() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/parse-url?url=http://example.com:8080/path?query=param"))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.jsonPath("$.protocol").value("http"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.host").value("example.com"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.port").value(8080))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.path").value("/path"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.query").value("query=param"));
+    }
+
+    @Test
+    void parseUrl_withInvalidUrl_returnsBadRequest() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/parse-url?url=invalid-url"))
+            .andExpect(MockMvcResultMatchers.status().isBadRequest());
+    }
+
+    @Test
+    void parseUrl_withMissingUrlParameter_returnsBadRequest() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/parse-url"))
+            .andExpect(MockMvcResultMatchers.status().isBadRequest());
+    }
+
+    @Test
+    void parseUrl_withUrlWithoutPort_returnsParsedComponents() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/parse-url?url=http://example.com/path?query=param"))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.jsonPath("$.protocol").value("http"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.host").value("example.com"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.port").value(-1))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.path").value("/path"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.query").value("query=param"));
+    }
+
+    @Test
+    void parseUrl_withUrlWithoutQuery_returnsParsedComponents() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/parse-url?url=http://example.com:8080/path"))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.jsonPath("$.protocol").value("http"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.host").value("example.com"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.port").value(8080))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.path").value("/path"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.query").isEmpty());
+    }
+
+    @Test
+    void parseUrl_withMultipleQueryParameters_returnsParsedComponents() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/parse-url?url=http%3A%2F%2Fexample.com%3A8080%2Fpath%3Fquery1%3Dparam1%26query2%3Dparam2"))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.jsonPath("$.protocol").value("http"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.host").value("example.com"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.port").value(8080))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.path").value("/path"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.query").value("query1=param1&query2=param2"));
+    }
+
+    @Test
+    void listFilesAndFolders_withValidPath_returnsFilesAndFolders() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/list-files?path=src/main/resources"))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andExpect(MockMvcResultMatchers.jsonPath("$.path").value("src/main/resources"))
+            .andExpect(MockMvcResultMatchers.jsonPath("$.files").isArray())
+            .andExpect(MockMvcResultMatchers.jsonPath("$.folders").isArray());
+    }
+
+    @Test
+    void listFilesAndFolders_withNonExistentPath_returnsError() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/list-files?path=/non/existent/path"))
+            .andExpect(MockMvcResultMatchers.status().isInternalServerError());
+    }
+
+    @Test
+    void listFilesAndFolders_withFilePath_returnsError() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/list-files?path=src/main/resources/colors.json"))
+            .andExpect(MockMvcResultMatchers.status().isInternalServerError());
+    }
+
+    @Test
+    void listFilesAndFolders_withEmptyPath_returnsError() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/list-files?path="))
+            .andExpect(MockMvcResultMatchers.status().isInternalServerError());
+    }
+
 }

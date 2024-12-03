@@ -2,6 +2,8 @@ package com.microsoft.hackathon.copilotdemo.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,6 +43,7 @@ import java.util.zip.ZipOutputStream;
 @RestController
 public class DemoController {
 
+    private static final Logger log = LoggerFactory.getLogger(DemoController.class);
     private final RestTemplate restTemplate;
 
     public DemoController(final RestTemplate restTemplate) {
@@ -125,11 +128,9 @@ public class DemoController {
     public String getChuckNorrisJoke() {
         String url = "https://api.chucknorris.io/jokes/random";
         try {
-            String response = restTemplate.getForObject(url, String.class);
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode jsonNode = objectMapper.readTree(response);
-            return jsonNode.get("value").asText();
-        } catch (IOException | RestClientException e) {
+            return restTemplate.getForObject(url, String.class);
+        } catch (RestClientException e) {
+            log.error("Error fetching joke", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error fetching joke", e);
         }
     }

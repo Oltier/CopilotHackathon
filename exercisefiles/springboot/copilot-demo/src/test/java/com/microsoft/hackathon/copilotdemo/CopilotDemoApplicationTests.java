@@ -207,7 +207,7 @@ class CopilotDemoApplicationTests {
         mockServer.expect(ExpectedCount.once(),
                 requestTo(new URI("https://api.chucknorris.io/jokes/random")))
             .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess("{\"value\": \"Chuck Norris joke\"}", MediaType.APPLICATION_JSON));
+            .andRespond(withSuccess("Chuck Norris joke", MediaType.TEXT_PLAIN));
 
         mockMvc.perform(MockMvcRequestBuilders.get("/chuck-norris-joke"))
             .andExpect(MockMvcResultMatchers.status().isOk())
